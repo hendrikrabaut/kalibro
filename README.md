@@ -8,8 +8,9 @@ eigen gelogde tijden**.
 - **Backend:** FastAPI, SQLAlchemy, SQLite, Alembic (`backend/`)
 - **Frontend:** HTML, CSS en JavaScript zonder buildstap (`frontend/`), plus
   `scherm.html`: een timer voor het 4"-aanraakscherm aan de Pi
-- **Planner:** verdeelt het resterende werk over je studieblokken, vroegste
-  deadline eerst, en zegt per deadline of het haalbaar is
+- **Planner:** verdeelt het resterende werk over je studieblokken,
+  wisselt vakken af per blok zolang dat geen deadline in gevaar brengt, en
+  zegt per deadline of het haalbaar is
 - **Kalibratie:** een correctiefactor per taaktype en per vak uit je gelogde
   tijd, met shrinkage zolang er weinig data is, een marge (80%) in plaats van
   één getal, en de afwijking (MAPE) per week

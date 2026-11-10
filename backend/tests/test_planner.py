@@ -128,3 +128,58 @@ def test_plan_endpoint_and_calendar(client):
     assert ics.headers["content-type"].startswith("text/calendar")
     assert "SUMMARY:Vak: hoofdstuk 1" in ics.text
     assert "SUMMARY:Deadline Vak: DL hoofdstuk 1" in ics.text
+
+
+def _evenings(count, hours=2):
+    return [(NOW + timedelta(days=d, hours=10), NOW + timedelta(days=d, hours=10 + hours)) for d in range(count)]
+
+
+def _courses_per_block(result, course_of):
+    per_block = []
+    for task_id, start, _ in result.blocks:
+        key = start.date()
+        if not per_block or per_block[-1][0] != key:
+            per_block.append((key, course_of[task_id]))
+    return [course for _, course in per_block]
+
+
+def test_courses_alternate_per_block():
+    items = [WorkItem(n, 120 * 60, None, (n,), course_id=1) for n in range(1, 4)]
+    items += [WorkItem(n, 120 * 60, None, (n,), course_id=2) for n in range(11, 14)]
+    result = schedule(_evenings(6), items)
+    course_of = {item.task_id: item.course_id for item in items}
+    assert _courses_per_block(result, course_of) == [1, 2, 1, 2, 1, 2]
+
+
+def test_alternating_never_costs_a_deadline():
+    # Course 1 needs all of the first three evenings for its exam on day 3.
+    exam = NOW + timedelta(days=2, hours=13)
+    items = [WorkItem(n, 120 * 60, exam, (n,), course_id=1) for n in range(1, 4)]
+    items += [WorkItem(n, 120 * 60, None, (n,), course_id=2) for n in range(11, 14)]
+    result = schedule(_evenings(6), items)
+    course_of = {item.task_id: item.course_id for item in items}
+    assert _courses_per_block(result, course_of) == [1, 1, 1, 2, 2, 2]
+    assert all(result.finish[n] <= exam for n in range(1, 4))
+
+
+def test_alternating_with_slack_still_alternates_before_a_deadline():
+    exam = NOW + timedelta(days=5, hours=13)
+    items = [WorkItem(n, 120 * 60, exam, (n,), course_id=1) for n in range(1, 4)]
+    items += [WorkItem(n, 120 * 60, None, (n,), course_id=2) for n in range(11, 13)]
+    result = schedule(_evenings(6), items)
+    course_of = {item.task_id: item.course_id for item in items}
+    assert _courses_per_block(result, course_of)[:2] == [1, 2]
+    assert all(result.finish[n] <= exam for n in range(1, 4))
+
+
+def test_scheduling_is_fast_enough_for_the_pi():
+    import time
+
+    items = [
+        WorkItem(course * 100 + n, 90 * 60, NOW + timedelta(weeks=4 + course), (n,), course_id=course)
+        for course in range(5) for n in range(40)
+    ]
+    started = time.perf_counter()
+    schedule(_evenings(180), items)
+    # The Pi 3 is roughly 10x slower than a laptop.
+    assert time.perf_counter() - started < 1.0

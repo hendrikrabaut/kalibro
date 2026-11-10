@@ -1,8 +1,9 @@
 """Put the remaining work into the free study blocks.
 
 - Free time: the weekly pattern plus the exceptions per date, in local time.
-- Order: earliest deadline first (EDF), and within one deadline the order of the
-  material. EDF is the order that keeps the worst lateness as small as possible.
+- Order: courses alternate per study block, as long as that makes no deadline
+  later than earliest-deadline-first (EDF) would. Within a course: EDF, then the
+  order of the material.
 - A task can be spread over several blocks, but never in pieces shorter than
   MIN_BLOCK_S, unless that finishes the task.
 - Remaining work = calibrated estimate - logged time, so replanning after
@@ -108,7 +109,8 @@ class WorkItem:
     task_id: int
     remaining_s: int
     due_at: datetime | None
-    order: tuple  # tie-break: course, position in the material
+    order: tuple  # tie-break: position in the material
+    course_id: int = 0
 
 
 @dataclass
@@ -118,13 +120,18 @@ class Schedule:
     finish: dict[int, datetime] = field(default_factory=dict)
 
 
-def schedule(intervals: list[Interval], items: list[WorkItem]) -> Schedule:
-    far = datetime.max
-    queue = sorted(items, key=lambda item: (item.due_at or far, item.order))
+FAR = datetime.max
+
+
+def _edf_key(item: WorkItem):
+    return (item.due_at or FAR, item.order)
+
+
+def _fill(intervals: list[Interval], queue: list[WorkItem]) -> Schedule:
+    """Put the items into the intervals in exactly this order."""
     free = [list(interval) for interval in intervals]
     result = Schedule()
     slot = 0
-
     for item in queue:
         left = item.remaining_s
         while left > 0 and slot < len(free):
@@ -147,6 +154,92 @@ def schedule(intervals: list[Interval], items: list[WorkItem]) -> Schedule:
                 slot += 1
         if left > 0:
             result.unscheduled_s[item.task_id] = left
+    return result
+
+
+def schedule_edf(intervals: list[Interval], items: list[WorkItem]) -> Schedule:
+    """Earliest deadline first: the order that keeps lateness smallest."""
+    return _fill(intervals, sorted(items, key=_edf_key))
+
+
+def _lateness(items: list[WorkItem], finish: dict[int, datetime], unscheduled: dict[int, int]) -> tuple[int, int]:
+    """(work with a deadline that does not fit at all, seconds finished too late)."""
+    missing = late = 0
+    for item in items:
+        if item.due_at is None:
+            continue
+        if item.task_id in unscheduled:
+            missing += unscheduled[item.task_id]
+        elif item.task_id in finish and finish[item.task_id] > item.due_at:
+            late += int((finish[item.task_id] - item.due_at).total_seconds())
+    return missing, late
+
+
+def schedule(intervals: list[Interval], items: list[WorkItem]) -> Schedule:
+    """Alternate courses per study block, but never at the cost of a deadline.
+
+    Block by block, the course you have not studied for longest goes first. That
+    choice is kept only if the rest of the plan (done EDF) is not later for any
+    deadline than plain EDF from here would be; otherwise the next course is
+    tried, and as a last resort the block follows plain EDF.
+    """
+    remaining = {item.task_id: item.remaining_s for item in items}
+    by_id = {item.task_id: item for item in items}
+    last_used: dict[int, int] = {}
+    result = Schedule()
+
+    def current() -> list[WorkItem]:
+        return [
+            WorkItem(i.task_id, remaining[i.task_id], i.due_at, i.order, i.course_id)
+            for i in items if remaining[i.task_id] > 0
+        ]
+
+    for index, interval in enumerate(intervals):
+        active = current()
+        if not active:
+            break
+        rest = intervals[index + 1 :]
+        baseline_plan = schedule_edf(intervals[index:], active)
+        baseline = _lateness(active, baseline_plan.finish, baseline_plan.unscheduled_s)
+
+        earliest_due: dict[int, tuple] = {}
+        for item in active:
+            earliest_due[item.course_id] = min(earliest_due.get(item.course_id, (FAR,)), _edf_key(item))
+        ranked = sorted(earliest_due, key=lambda course: (last_used.get(course, -1), earliest_due[course]))
+
+        chosen: Schedule | None = None
+        if len(ranked) > 1:
+            for course in ranked:
+                # This course first, the rest of the block in EDF order.
+                queue = sorted(active, key=lambda i: (i.course_id != course, _edf_key(i)))
+                trial = _fill([interval], queue)
+                if not trial.blocks or by_id[trial.blocks[0][0]].course_id != course:
+                    continue  # nothing of this course fits in this block
+                left_after = dict(remaining)
+                for task_id, start, end in trial.blocks:
+                    left_after[task_id] -= int((end - start).total_seconds())
+                after = [
+                    WorkItem(i.task_id, left_after[i.task_id], i.due_at, i.order, i.course_id)
+                    for i in active if left_after[i.task_id] > 0
+                ]
+                follow = schedule_edf(rest, after)
+                finish = {**trial.finish, **follow.finish}
+                if _lateness(active, finish, follow.unscheduled_s) <= baseline:
+                    chosen = trial
+                    break
+        if chosen is None:
+            chosen = _fill([interval], sorted(active, key=_edf_key))
+
+        for task_id, start, end in chosen.blocks:
+            remaining[task_id] -= int((end - start).total_seconds())
+            result.blocks.append((task_id, start, end))
+            result.finish[task_id] = end
+            last_used[by_id[task_id].course_id] = index
+
+    for task_id, seconds in remaining.items():
+        if seconds > 0:
+            result.unscheduled_s[task_id] = seconds
+            result.finish.pop(task_id, None)
     return result
 
 
@@ -188,7 +281,7 @@ def gather(db: Session, now: datetime | None = None) -> PlanInput:
             needs_estimate.append(view)
             continue
         deadline = deadlines.get(task.deadline_id)
-        items.append(WorkItem(task.id, view["remaining_s"], deadline.due_at if deadline else None, (task.course_id, *order)))
+        items.append(WorkItem(task.id, view["remaining_s"], deadline.due_at if deadline else None, order, task.course_id))
         high[task.id] = max(view["estimate_high_s"] - view["logged_s"], view["remaining_s"])
 
     future_deadlines = [d.due_at for d in deadlines.values() if d.due_at > now]
