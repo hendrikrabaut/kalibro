@@ -7,7 +7,7 @@ from app.models import Section, Source, Task
 from app.routes.courses import get_course
 from app.schemas import SourceDetail, SourceOut
 from app.services.estimates import rates_by_type, task_out
-from app.services.ingest import DuplicateSource, UploadError, ingest_pdf, source_path
+from app.services.ingest import DuplicateSource, UploadError, ingest_pdf, reprocess, source_path, source_tasks
 
 
 router = APIRouter(tags=["bronnen"])
@@ -65,10 +65,20 @@ def delete_source(source_id: int, db: Session = Depends(get_db)):
     source = get_source(db, source_id)
     path = source_path(source)
     # Tasks from this source go too; section_id would otherwise just become NULL.
-    for task in db.scalars(
-        select(Task).join(Section, Task.section_id == Section.id).where(Section.source_id == source_id)
-    ):
+    for task in source_tasks(db, source_id):
         db.delete(task)
     db.delete(source)
     db.commit()
     path.unlink(missing_ok=True)
+
+
+@router.post("/api/sources/{source_id}/reprocess", response_model=SourceDetail)
+def reprocess_source(source_id: int, db: Session = Depends(get_db)):
+    source = get_source(db, source_id)
+    if not source_path(source).exists():
+        raise HTTPException(410, "Het bestand van deze bron is niet meer aanwezig")
+    try:
+        reprocess(db, source)
+    except UploadError as error:
+        raise HTTPException(409, str(error)) from error
+    return source_detail(db, source)

@@ -50,17 +50,18 @@ def test_upload_creates_sections_and_estimated_tasks(client, course_id):
     assert [s["title"] for s in body["sections"]] == ["H1", "H1.1", "H2"]
     assert body["sections"][1]["parent_id"] == body["sections"][0]["id"]
 
+    # H1 is small enough to be one task, its subsection included.
     tasks = {(t["title"], t["task_type"]): t for t in body["tasks"]}
-    assert tasks[("H1.1", "reading")]["amount"] == 2
-    assert tasks[("H1.1", "reading")]["estimate_s"] == 2 * 300
-    assert tasks[("H1.1: oefeningen", "exercises")]["estimate_s"] == 2 * 900
-    assert tasks[("H1.1: oefeningen", "exercises")]["unit"] == "exercise"
+    assert tasks[("H1", "reading")]["amount"] == 3
+    assert tasks[("H1", "reading")]["estimate_s"] == 3 * 300
+    assert tasks[("H1: oefeningen", "exercises")]["estimate_s"] == 2 * 900
+    assert tasks[("H1: oefeningen", "exercises")]["unit"] == "exercise"
 
     stored = list(database.UPLOAD_DIR.glob("*.pdf"))
     assert len(stored) == 1
     assert not list(database.UPLOAD_DIR.glob("*.part"))
 
-    assert len(client.get(f"/api/courses/{course_id}/tasks").json()) == 4
+    assert len(client.get(f"/api/courses/{course_id}/tasks").json()) == 3
 
 
 def test_same_file_twice_is_refused(client, course_id):
@@ -103,3 +104,28 @@ def test_deleting_source_removes_file_and_tasks(client, course_id):
     assert client.delete(f"/api/sources/{source['id']}").status_code == 204
     assert client.get(f"/api/courses/{course_id}/tasks").json() == []
     assert not list(database.UPLOAD_DIR.glob("*.pdf"))
+
+
+def test_reprocess_rebuilds_tasks(client, course_id):
+    source = _upload(client, course_id, _pdf_bytes([[BODY], [BODY]], toc=[[1, "A", 1], [1, "B", 2]])).json()
+
+    again = client.post(f"/api/sources/{source['id']}/reprocess")
+    assert again.status_code == 200
+    assert [t["title"] for t in again.json()["tasks"]] == ["A", "B"]
+    assert len(client.get(f"/api/courses/{course_id}/tasks").json()) == 2
+
+
+def test_reprocess_refused_once_time_is_logged(client, course_id):
+    from datetime import datetime
+
+    from app.database import SessionLocal
+    from app.models import StudySession
+
+    source = _upload(client, course_id, _pdf_bytes([[BODY]])).json()
+    with SessionLocal() as db:
+        db.add(StudySession(task_id=source["tasks"][0]["id"], start_at=datetime(2026, 11, 10, 9)))
+        db.commit()
+
+    response = client.post(f"/api/sources/{source['id']}/reprocess")
+    assert response.status_code == 409
+    assert "gelogd" in response.json()["detail"]

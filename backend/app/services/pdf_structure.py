@@ -22,6 +22,13 @@ EXERCISE_PATTERN = re.compile(
 )
 WORD_PATTERN = re.compile(r"\w+")
 
+# A section with only exercises, e.g. "Exercises" at the end of each chapter.
+EXERCISE_SECTION_PATTERN = re.compile(
+    r"^\s*(\d+(\.\d+)*\.?\s+)?(exercises|oefeningen|opgaven|opdrachten|vragen|questions|problems)\b",
+    re.IGNORECASE,
+)
+NUMBERED_ITEM_PATTERN = re.compile(r"^\s*(\d{1,3})[.)]\s", re.MULTILINE)
+
 # A page with fewer characters than this counts as having no text layer.
 MIN_TEXT_CHARS = 25
 SCANNED_SHARE = 0.8
@@ -43,6 +50,8 @@ class ExtractedSection:
     own_pages: int = 0
     word_count: int = 0
     exercise_count: int = 0
+    # Only for exercise sections: the number of questions "1. ... 2. ..." in it.
+    numbered_items: int = 0
 
 
 @dataclass
@@ -62,7 +71,8 @@ class _PageStats:
 
 def extract_structure(path: Path | str) -> ExtractedStructure:
     with pymupdf.open(path) as document:
-        pages = [_page_stats(page.get_text()) for page in document]
+        texts = [page.get_text() for page in document]
+        pages = [_page_stats(text) for text in texts]
         page_count = len(pages)
 
         if page_count == 0:
@@ -81,12 +91,38 @@ def extract_structure(path: Path | str) -> ExtractedStructure:
             entries = [(1, title, 1)]
             method = "none"
 
-    return ExtractedStructure(
-        page_count=page_count,
-        scanned=scanned,
-        method=method,
-        sections=_build_sections(entries, pages),
-    )
+    sections = _build_sections(entries, pages)
+    for index, section in enumerate(sections):
+        if EXERCISE_SECTION_PATTERN.match(section.title):
+            following = sections[index + 1] if index + 1 < len(sections) else None
+            section.numbered_items = count_numbered_items(_section_text(section, following, texts))
+
+    return ExtractedStructure(page_count=page_count, scanned=scanned, method=method, sections=sections)
+
+
+def _section_text(
+    section: ExtractedSection, following: ExtractedSection | None, texts: list[str]
+) -> str:
+    """Text from the section's heading up to the next heading."""
+    text = "\n".join(texts[section.page_start - 1 : section.page_end])
+    start = text.find(section.title)
+    if start > 0:
+        text = text[start:]
+    if following is not None and following.page_start <= section.page_end:
+        end = text.find(following.title, len(section.title))
+        if end > 0:
+            text = text[:end]
+    return text
+
+
+def count_numbered_items(text: str) -> int:
+    """Count questions numbered 1, 2, 3, ... in order. Stray numbers (footnotes,
+    years) do not break the sequence, they are simply skipped."""
+    expected = 1
+    for match in NUMBERED_ITEM_PATTERN.finditer(text):
+        if int(match.group(1)) == expected:
+            expected += 1
+    return expected - 1
 
 
 def _page_stats(text: str) -> _PageStats:

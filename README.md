@@ -43,11 +43,17 @@ De tests gebruiken een tijdelijke database en maken hun eigen PDF's aan.
 | `POST` | `/api/courses/{id}/sources` | PDF uploaden: structuur + taken met schatting |
 | `GET` | `/api/courses/{id}/sources` | bronnen van een vak |
 | `GET/DELETE` | `/api/sources/{id}` | bron met onderdelen en taken |
+| `POST` | `/api/sources/{id}/reprocess` | opnieuw verwerken (geweigerd zodra er tijd gelogd is) |
 | `GET` | `/api/courses/{id}/tasks` | taken van een vak met schatting |
 | `PATCH` | `/api/tasks/{id}` | taak aanpassen (o.a. eigen schatting) |
 
-Bij een upload krijgt elk onderdeel met eigen pagina's een leestaak, en een
-oefentaak als er oefeningen gevonden zijn ("Oefening 3", "Opgave 2", ...).
+Een taak is een studie-eenheid, meestal een hoofdstuk. Kalibro daalt af in de
+inhoudstafel tot een onderdeel hoogstens 60 pagina's telt: delen worden
+hoofdstukken, hoofdstukken worden niet opgesplitst in subkoppen. Een te groot
+hoofdstuk wordt in blokken van ongeveer 25 pagina's verdeeld. Cover, inhoudstafel,
+voorwoord, index, bibliografie en oplossingen krijgen geen taak. Een sectie
+"Exercises" of "Oefeningen" wordt een aparte oefentaak, met als omvang het aantal
+genummerde vragen.
 Taken uit een gescande PDF hebben `needs_manual_estimate: true` tot je zelf een
 schatting invult. Dezelfde PDF twee keer uploaden geeft `409`.
 

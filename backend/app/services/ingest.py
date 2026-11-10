@@ -11,8 +11,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import database
-from app.models import Section, Source, Task
-from app.services.pdf_structure import extract_structure
+from app.models import Section, Source, StudySession, Task
+from app.services.pdf_structure import ExtractedStructure, extract_structure
+from app.services.task_builder import build_tasks
 
 
 CHUNK_SIZE = 1024 * 1024
@@ -82,6 +83,19 @@ def ingest_pdf(db: Session, course_id: int, filename: str, stream: BinaryIO) -> 
     db.add(source)
     db.flush()
 
+    store_structure(db, source, structure)
+
+    final_path = source_path(source)
+    shutil.move(temporary_path, final_path)
+    try:
+        db.commit()
+    except Exception:
+        final_path.unlink(missing_ok=True)
+        raise
+    return source
+
+
+def store_structure(db: Session, source: Source, structure: ExtractedStructure) -> None:
     section_ids: list[int] = []
     for position, extracted in enumerate(structure.sections):
         section = Section(
@@ -99,23 +113,37 @@ def ingest_pdf(db: Session, course_id: int, filename: str, stream: BinaryIO) -> 
         db.flush()
         section_ids.append(section.id)
 
-        # A heading with no pages of its own (its children cover them) needs no task.
-        if extracted.own_pages:
-            db.add(Task(
-                course_id=course_id, section_id=section.id, title=extracted.title,
-                task_type="reading", amount=extracted.own_pages,
-            ))
-        if extracted.exercise_count:
-            db.add(Task(
-                course_id=course_id, section_id=section.id, title=f"{extracted.title}: oefeningen",
-                task_type="exercises", amount=extracted.exercise_count,
-            ))
 
-    final_path = source_path(source)
-    shutil.move(temporary_path, final_path)
-    try:
-        db.commit()
-    except Exception:
-        final_path.unlink(missing_ok=True)
-        raise
+    for spec in build_tasks(structure.sections):
+        db.add(Task(
+            course_id=source.course_id, section_id=section_ids[spec.section_index],
+            title=spec.title, task_type=spec.task_type, amount=spec.amount,
+        ))
+
+
+def reprocess(db: Session, source: Source) -> Source:
+    """Rebuild sections and tasks from the stored file, e.g. after the
+    recognition improved. Refused once time is logged on its tasks."""
+    tasks = source_tasks(db, source.id)
+    if any(db.scalar(select(StudySession.id).where(StudySession.task_id == task.id).limit(1)) for task in tasks):
+        raise UploadError("Er is al tijd gelogd op taken van deze bron; opnieuw verwerken zou die wissen")
+
+    structure = extract_structure(source_path(source))
+    for task in tasks:
+        db.delete(task)
+    for section in db.scalars(select(Section).where(Section.source_id == source.id, Section.parent_id.is_(None))):
+        db.delete(section)  # children follow through ON DELETE CASCADE
+    db.flush()
+
+    source.page_count = structure.page_count
+    source.scanned = structure.scanned
+    source.structure_method = structure.method
+    store_structure(db, source, structure)
+    db.commit()
     return source
+
+
+def source_tasks(db: Session, source_id: int) -> list[Task]:
+    return list(db.scalars(
+        select(Task).join(Section, Task.section_id == Section.id).where(Section.source_id == source_id)
+    ))
