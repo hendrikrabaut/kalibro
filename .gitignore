@@ -1,0 +1,15 @@
+# Data: database, backups and uploaded course material never go in the repo.
+database/*.db
+data/
+*.pdf
+*.pptx
+*.docx
+
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.env
+
+# Working notes with personal details.
+CONTEXT.md

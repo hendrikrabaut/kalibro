@@ -1,0 +1,26 @@
+[project]
+name = "kalibro"
+version = "0.1.0"
+description = "Kalibro: studieplanner die zijn schattingen kalibreert met je gelogde tijden"
+requires-python = ">=3.13"
+dependencies = [
+    "alembic>=1.16",
+    "fastapi>=0.115",
+    "pymupdf>=1.26",
+    "python-multipart>=0.0.20",
+    "sqlalchemy>=2.0",
+    "uvicorn[standard]>=0.34",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28",
+    "pytest>=8.3",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.uv]
+package = false
