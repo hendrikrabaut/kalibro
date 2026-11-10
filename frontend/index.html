@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1D2B3A">
+  <title>Kalibro</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="#vandaag">Kalibro</a>
+    <nav aria-label="Hoofdmenu">
+      <a href="#vandaag" data-view="vandaag">Vandaag</a>
+      <a href="#vakken" data-view="vakken">Vakken</a>
+      <a href="#plan" data-view="plan">Plan</a>
+      <a href="#beschikbaarheid" data-view="beschikbaarheid">Beschikbaar</a>
+      <a href="#kalibratie" data-view="kalibratie">Kalibratie</a>
+    </nav>
+  </header>
+  <main id="app"></main>
+  <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+[Unit]
+Description=Kalibro database backup
+
+[Service]
+Type=oneshot
+User=pi
+WorkingDirectory=/home/pi/kalibro/backend
+ExecStart=/home/pi/kalibro/backend/.venv/bin/python -m scripts.backup

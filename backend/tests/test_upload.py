@@ -129,3 +129,11 @@ def test_reprocess_refused_once_time_is_logged(client, course_id):
     response = client.post(f"/api/sources/{source['id']}/reprocess")
     assert response.status_code == 409
     assert "gelogd" in response.json()["detail"]
+
+
+def test_create_and_delete_own_task(client, course_id):
+    task = client.post(f"/api/courses/{course_id}/tasks", json={"title": "Labo 3", "task_type": "lab"}).json()
+    assert task["estimate_s"] == 7200
+    assert client.post(f"/api/courses/{course_id}/tasks", json={"title": "x", "deadline_id": 999}).status_code == 400
+    assert client.delete(f"/api/tasks/{task['id']}").status_code == 204
+    assert client.get(f"/api/courses/{course_id}/tasks").json() == []

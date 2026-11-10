@@ -60,6 +60,14 @@ class TaskOut(BaseModel):
     status: str
 
 
+class TaskCreate(BaseModel):
+    title: str = Field(min_length=1)
+    task_type: str = Field(default="other", pattern=f"^({'|'.join(TASK_TYPES)})$")
+    amount: float = Field(default=1, ge=0)
+    manual_estimate_s: int | None = Field(default=None, ge=0)
+    deadline_id: int | None = None
+
+
 class TaskUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1)
     task_type: str | None = Field(default=None, pattern=f"^({'|'.join(TASK_TYPES)})$")

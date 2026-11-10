@@ -1,0 +1,14 @@
+[Unit]
+Description=Kalibro
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/kalibro/backend
+Environment=KALIBRO_TZ=Europe/Brussels
+ExecStart=/home/pi/kalibro/backend/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8002
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

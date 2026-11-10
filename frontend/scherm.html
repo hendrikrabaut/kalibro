@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kalibro timer</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="screen">
+  <!-- The 4" touch screen next to the Pi: start, stop, done. Big targets for resistive touch. -->
+  <header class="screen-header">
+    <b id="screen-clock"></b>
+    <span id="screen-date"></span>
+  </header>
+  <main id="screen"></main>
+  <footer class="screen-footer muted" id="screen-status"></footer>
+  <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+  <script type="module" src="js/screen.js"></script>
+</body>
+</html>
