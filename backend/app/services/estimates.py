@@ -29,24 +29,3 @@ def needs_manual_estimate(db: Session, task: Task) -> bool:
         select(Source.scanned).join(Section, Section.source_id == Source.id).where(Section.id == task.section_id)
     )
     return bool(scanned)
-
-
-def task_out(db: Session, task: Task, rates: dict[str, TaskRate] | None = None) -> dict:
-    rates = rates if rates is not None else rates_by_type(db)
-    rate = rates.get(task.task_type)
-    manual = needs_manual_estimate(db, task)
-    return {
-        "id": task.id,
-        "course_id": task.course_id,
-        "section_id": task.section_id,
-        "deadline_id": task.deadline_id,
-        "title": task.title,
-        "task_type": task.task_type,
-        "amount": task.amount,
-        "unit": rate.unit if rate else "item",
-        "manual_estimate_s": task.manual_estimate_s,
-        "estimate_at_start_s": task.estimate_at_start_s,
-        "estimate_s": None if manual else base_estimate_s(task, rate),
-        "needs_manual_estimate": manual,
-        "status": task.status,
-    }

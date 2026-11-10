@@ -54,7 +54,7 @@ def test_upload_creates_sections_and_estimated_tasks(client, course_id):
     tasks = {(t["title"], t["task_type"]): t for t in body["tasks"]}
     assert tasks[("H1", "reading")]["amount"] == 3
     assert tasks[("H1", "reading")]["estimate_s"] == 3 * 300
-    assert tasks[("H1: oefeningen", "exercises")]["estimate_s"] == 2 * 900
+    assert tasks[("H1: oefeningen", "exercises")]["estimate_s"] == 2 * 300
     assert tasks[("H1: oefeningen", "exercises")]["unit"] == "exercise"
 
     stored = list(database.UPLOAD_DIR.glob("*.pdf"))

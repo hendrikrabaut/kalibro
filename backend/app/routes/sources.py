@@ -6,7 +6,7 @@ from app.database import get_db
 from app.models import Section, Source, Task
 from app.routes.courses import get_course
 from app.schemas import SourceDetail, SourceOut
-from app.services.estimates import rates_by_type, task_out
+from app.services.task_view import task_views
 from app.services.ingest import DuplicateSource, UploadError, ingest_pdf, reprocess, source_path, source_tasks
 
 
@@ -21,11 +21,10 @@ def source_detail(db: Session, source: Source) -> dict:
         select(Task).join(Section, Task.section_id == Section.id)
         .where(Section.source_id == source.id).order_by(Section.position, Task.id)
     ).all()
-    rates = rates_by_type(db)
     return {
         **SourceOut.model_validate(source).model_dump(),
         "sections": sections,
-        "tasks": [task_out(db, task, rates) for task in tasks],
+        "tasks": task_views(db, list(tasks)),
     }
 
 

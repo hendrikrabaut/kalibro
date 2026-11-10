@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -21,3 +21,6 @@ class Deadline(Base):
 
     # Lets a re-fetched feed update an event instead of duplicating it.
     ical_uid: Mapped[str | None] = mapped_column(String)
+
+    # A deleted feed event is kept as ignored, so the next sync does not bring it back.
+    ignored: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")

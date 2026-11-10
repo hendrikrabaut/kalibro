@@ -6,7 +6,8 @@ from app.database import get_db
 from app.models import Deadline, Task
 from app.routes.courses import get_course
 from app.schemas import TaskOut, TaskUpdate
-from app.services.estimates import rates_by_type, task_out
+from app.services.task_view import task_view, task_views
+from app.timeutil import now_utc
 
 
 router = APIRouter(tags=["taken"])
@@ -15,9 +16,8 @@ router = APIRouter(tags=["taken"])
 @router.get("/api/courses/{course_id}/tasks", response_model=list[TaskOut])
 def list_tasks(course_id: int, db: Session = Depends(get_db)):
     get_course(db, course_id)
-    rates = rates_by_type(db)
     tasks = db.scalars(select(Task).where(Task.course_id == course_id).order_by(Task.id)).all()
-    return [task_out(db, task, rates) for task in tasks]
+    return task_views(db, list(tasks))
 
 
 @router.patch("/api/tasks/{task_id}", response_model=TaskOut)
@@ -32,5 +32,7 @@ def update_task(task_id: int, payload: TaskUpdate, db: Session = Depends(get_db)
             raise HTTPException(400, "Deadline hoort niet bij dit vak")
     for key, value in changes.items():
         setattr(task, key, value)
+    if "status" in changes:
+        task.completed_at = now_utc() if task.status == "done" else None
     db.commit()
-    return task_out(db, task)
+    return task_view(db, task)
