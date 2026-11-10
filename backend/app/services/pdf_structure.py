@@ -40,6 +40,7 @@ class ExtractedSection:
     parent_index: int | None = None
     # Counts over the pages this section owns itself, excluding its children,
     # so summing over all sections never counts a page twice.
+    own_pages: int = 0
     word_count: int = 0
     exercise_count: int = 0
 
@@ -189,6 +190,7 @@ def _build_sections(
             owner += 1
         if sections[owner].page_start > page_number:
             continue  # front matter before the first section
+        sections[owner].own_pages += 1
         sections[owner].word_count += pages[page_number - 1].words
         sections[owner].exercise_count += pages[page_number - 1].exercises
 

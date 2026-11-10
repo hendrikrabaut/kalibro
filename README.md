@@ -34,6 +34,23 @@ uv run pytest
 
 De tests gebruiken een tijdelijke database en maken hun eigen PDF's aan.
 
+## API (tot nu toe)
+
+| Methode | Pad | Wat |
+|---|---|---|
+| `GET/POST` | `/api/courses` | vakken oplijsten of aanmaken |
+| `GET/PUT/DELETE` | `/api/courses/{id}` | één vak |
+| `POST` | `/api/courses/{id}/sources` | PDF uploaden: structuur + taken met schatting |
+| `GET` | `/api/courses/{id}/sources` | bronnen van een vak |
+| `GET/DELETE` | `/api/sources/{id}` | bron met onderdelen en taken |
+| `GET` | `/api/courses/{id}/tasks` | taken van een vak met schatting |
+| `PATCH` | `/api/tasks/{id}` | taak aanpassen (o.a. eigen schatting) |
+
+Bij een upload krijgt elk onderdeel met eigen pagina's een leestaak, en een
+oefentaak als er oefeningen gevonden zijn ("Oefening 3", "Opgave 2", ...).
+Taken uit een gescande PDF hebben `needs_manual_estimate: true` tot je zelf een
+schatting invult. Dezelfde PDF twee keer uploaden geeft `409`.
+
 ## Datamodel
 
 ```

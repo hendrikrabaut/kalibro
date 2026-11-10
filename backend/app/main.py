@@ -6,6 +6,9 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import IntegrityError
 
 from app import models  # noqa: F401  (registers all tables)
+from app.routes.courses import router as courses_router
+from app.routes.sources import router as sources_router
+from app.routes.tasks import router as tasks_router
 
 
 FRONTEND_PATH = Path(__file__).resolve().parents[2] / "frontend"
@@ -23,6 +26,11 @@ def handle_integrity_error(_request: Request, _error: IntegrityError):
         status_code=409,
         content={"detail": "Dit botst met bestaande data: een verwijzing bestaat niet, is nog in gebruik of moet uniek zijn"},
     )
+
+
+app.include_router(courses_router)
+app.include_router(sources_router)
+app.include_router(tasks_router)
 
 
 @app.get("/api/health")

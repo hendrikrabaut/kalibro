@@ -1,4 +1,5 @@
 import os
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -13,7 +14,7 @@ from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
-from app.database import engine
+from app.database import UPLOAD_DIR, engine
 from app.main import app
 
 
@@ -45,6 +46,7 @@ def clean_tables(schema):
     with engine.begin() as connection:
         for table in TABLES:
             connection.execute(text(f"DELETE FROM {table}"))
+    shutil.rmtree(UPLOAD_DIR, ignore_errors=True)
 
 
 @pytest.fixture

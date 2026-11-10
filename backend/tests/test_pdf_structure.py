@@ -49,6 +49,7 @@ def test_bookmarks_give_tree_ranges_and_counts(tmp_path):
     assert chapter2.exercise_count == 1
     # Chapter 1 owns only page 2; its child owns pages 3 and 4.
     assert concepts.word_count > chapter1.word_count > 0
+    assert (chapter1.own_pages, concepts.own_pages, chapter2.own_pages) == (1, 2, 1)
 
 
 def test_skipped_bookmark_levels_are_normalised():
